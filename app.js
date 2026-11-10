@@ -4,6 +4,7 @@ import { buildPdf } from './pdf.js';
 import { round, money, today, addDays, fmtDate, totals, statusOf, esc, normRate } from './util.js';
 
 export const APP_NAME = 'QuickTicket'; // change the app's name here
+const VERSION = '1.0.3';
 
 // ---------- State (loaded from the device database) ----------
 const S = { customers: [], items: [], docs: [], biz: {}, counters: { quote: 1001, invoice: 1001 } };
@@ -620,7 +621,8 @@ function viewSettings() {
     <div class="actions">
       <button class="ghost" data-act="export">Download backup</button>
       <label class="btn ghost" style="margin:0">Restore backup<input type="file" id="imp" accept="application/json,.json" hidden></label>
-    </div>`;
+    </div>
+    <p>${APP_NAME} version ${VERSION}</p>`;
 
   view.onchange = async e => {
     if (e.target.id === 'logo' && e.target.files[0]) {
