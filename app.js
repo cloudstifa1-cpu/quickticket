@@ -1,10 +1,11 @@
 // QuickTicket — quotes, invoices and payments for trades. Version 1 (local-first, works offline).
 import { db, uid } from './db.js';
 import { buildPdf } from './pdf.js';
+import { parseVoice, canListen, toggleListen } from './voice.js';
 import { round, money, today, addDays, fmtDate, totals, statusOf, esc, normRate } from './util.js';
 
 export const APP_NAME = 'QuickTicket'; // change the app's name here
-const VERSION = '1.0.4';
+const VERSION = '1.1.0';
 
 // ---------- State (loaded from the device database) ----------
 const S = { customers: [], items: [], docs: [], biz: {}, counters: { quote: 1001, invoice: 1001 } };
@@ -174,6 +175,7 @@ function viewHome() {
     <div class="actions">
       <a class="btn" href="#/doc/new/quote">+ New quote</a>
       <a class="btn" href="#/doc/new/invoice">+ New invoice</a>
+      <a class="btn ghost" href="#/doc/new/quote?voice=1">🎤 Talk a quote</a>
     </div>
     <div class="stats">
       <div class="card stat"><div>Money owed</div><div class="num">${sum(unpaid)}</div></div>
@@ -251,6 +253,7 @@ function viewDoc(id, kindNew, params) {
   }
   newCust = null;
   drawEditor();
+  if (params.voice) { const v = view.querySelector('#vtext'); v.focus(); v.scrollIntoView({ block: 'center' }); }
 }
 
 function drawEditor() {
@@ -267,6 +270,13 @@ function drawEditor() {
     </div>
     ${src?.convertedTo ? `<p class="note">Turned into an invoice. <a href="#/doc/${src.convertedTo}">Open the invoice</a></p>` : ''}
     ${src?.fromQuote ? `<p class="note">Made from a quote. <a href="#/doc/${src.fromQuote}">Open the quote</a></p>` : ''}
+
+    <div class="card" id="voicebox">
+      <div class="row between wrap"><b>🎤 Say it or type it</b>${canListen ? `<button class="small" data-act="mic">🎤 Talk</button>` : ''}</div>
+      <textarea id="vtext" aria-label="Say or type the job" placeholder="John Smith, water heater flush 250 dollars, 2 elements at 40 each"></textarea>
+      <div class="actions" style="margin-bottom:0"><button data-act="vfill">Fill it in</button></div>
+      ${canListen ? '' : '<p>Tap the microphone on your keyboard to talk.</p>'}
+    </div>
 
     <label for="cust">Customer</label>
     <select id="cust" data-f="customerId">
@@ -322,6 +332,7 @@ function drawEditor() {
 
   drawLines();
   drawTotals();
+  if (newCust) { view.querySelector('#cust').value = '__new'; drawNewCust(); }
 
   view.oninput = view.onchange = e => {
     const el = e.target;
@@ -370,6 +381,13 @@ function drawEditor() {
       await save('items', { id: uid(), name: l.desc.trim(), price: round(l.price), type: l.type });
       return toast('Saved to your items');
     }
+    if (act === 'mic') {
+      toggleListen(view.querySelector('#vtext'), on => { b.textContent = on ? '🔴 Stop' : '🎤 Talk'; }, err =>
+        toast(['not-allowed', 'service-not-allowed'].includes(err) ? 'Microphone blocked. Tap the mic on your keyboard instead.'
+          : err === 'no-speech' ? "Didn't hear anything. Try again." : "Voice isn't working here. Tap the mic on your keyboard instead."));
+      return;
+    }
+    if (act === 'vfill') return fillFromVoice();
     if (act === 'delete') {
       if (!confirmInline(b, 'Tap again to delete')) return;
       await remove('docs', d.id);
@@ -411,18 +429,43 @@ function drawEditor() {
   };
 }
 
+function fillFromVoice() {
+  const ta = view.querySelector('#vtext');
+  const r = parseVoice(ta.value, S.customers, S.items);
+  if (!r.lines.length && !r.customerId && !r.newCustomer) {
+    return toast("Couldn't find a job and a price. Try: drain cleaning 150 dollars");
+  }
+  const d = draft;
+  if (d.isNew && r.kind && r.kind !== d.kind) {
+    d.kind = r.kind;
+    d.dueDate = addDays(d.issueDate, r.kind === 'invoice' ? (+S.biz.termsDays || 14) : 30);
+  }
+  if (r.customerId) { d.customerId = r.customerId; newCust = null; }
+  else if (r.newCustomer) { newCust = { name: r.newCustomer, phone: '', email: '', address: '' }; d.customerId = ''; }
+  if (r.lines.length) {
+    const blank = d.lines.length === 1 && !d.lines[0].desc && !+d.lines[0].price;
+    d.lines = blank ? r.lines : d.lines.concat(r.lines);
+  }
+  drawEditor();
+  const box = view.querySelector('#vtext');
+  box.value = r.skipped.join(', ');
+  const n = r.lines.length;
+  toast(n ? `Added ${n} line${n > 1 ? 's' : ''}. Check them, then Save.` : 'Customer filled in. Now say the jobs and prices.');
+  if (r.skipped.length) setTimeout(() => toast("Couldn't understand what's left in the box. Fix it and tap Fill it in."), 2700);
+}
+
 function drawNewCust() {
   const box = view.querySelector('#newcust');
   if (!newCust) { box.innerHTML = ''; return; }
   box.innerHTML = `<div class="card">
-    <label for="nc1">Name</label><input id="nc1" data-nc="name" autocomplete="off">
+    <label for="nc1">Name</label><input id="nc1" data-nc="name" autocomplete="off" value="${esc(newCust.name)}">
     <div class="grid2">
-      <div><label for="nc2">Phone</label><input id="nc2" data-nc="phone" type="tel" inputmode="tel"></div>
-      <div><label for="nc3">Email</label><input id="nc3" data-nc="email" type="email" inputmode="email"></div>
+      <div><label for="nc2">Phone</label><input id="nc2" data-nc="phone" type="tel" inputmode="tel" value="${esc(newCust.phone)}"></div>
+      <div><label for="nc3">Email</label><input id="nc3" data-nc="email" type="email" inputmode="email" value="${esc(newCust.email)}"></div>
     </div>
-    <label for="nc4">Address</label><input id="nc4" data-nc="address">
+    <label for="nc4">Address</label><input id="nc4" data-nc="address" value="${esc(newCust.address)}">
     <p>This customer is saved when you save the ${draft.kind}.</p></div>`;
-  box.querySelector('#nc1').focus();
+  box.querySelector(newCust.name ? '#nc2' : '#nc1').focus();
 }
 
 function drawLines() {

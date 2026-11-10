@@ -13,6 +13,7 @@ Private code. Do not make this repo public.
 - Status: draft, sent, overdue, paid (quotes: draft, sent, accepted)
 - Reminders: the Home screen lists who to remind (3 days before due, due today, 7+ days late), with one-tap text or email
 - Saved items for one-tap adding
+- Voice-to-invoice: say or type "John Smith, water heater flush 250 dollars, 2 elements at 40 each" and it fills the customer and lines (voice.js, works offline)
 - Your business name, info and logo on every quote and invoice
 - Works offline; everything saves on the device; backup and restore file
 
