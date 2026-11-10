@@ -1,7 +1,7 @@
 // QuickTicket — quotes, invoices and payments for trades. Version 1 (local-first, works offline).
 import { db, uid } from './db.js';
 import { buildPdf } from './pdf.js';
-import { round, money, today, addDays, fmtDate, totals, statusOf, esc } from './util.js';
+import { round, money, today, addDays, fmtDate, totals, statusOf, esc, normRate } from './util.js';
 
 export const APP_NAME = 'QuickTicket'; // change the app's name here
 
@@ -445,7 +445,7 @@ function drawTotals() {
   view.querySelector('#totals').innerHTML = `
     <div class="row"><span>Subtotal</span><span>${money(t.subtotal)}</span></div>
     ${t.discount ? `<div class="row"><span>Discount</span><span>-${money(t.discount)}</span></div>` : ''}
-    <div class="row"><span>Tax</span><span>${money(t.tax)}</span></div>
+    <div class="row"><span>Tax (${normRate(draft.taxRate)}%${draft.taxOn === 'materials' ? ', materials only' : ''})</span><span>${money(t.tax)}</span></div>
     <div class="row grand"><span>Total</span><span>${money(t.total)}</span></div>`;
 }
 
@@ -461,7 +461,7 @@ async function saveDraft() {
   }
   d.lines = d.lines.filter(l => l.desc.trim() || +l.price).map(l => ({ ...l, qty: +l.qty || 0, price: round(l.price) }));
   if (!d.lines.length) { d.lines = [blankLine()]; toast('Add at least one line'); drawLines(); return null; }
-  d.taxRate = +d.taxRate || 0;
+  d.taxRate = normRate(d.taxRate);
   d.discount = round(d.discount);
   if (!d.number) d.number = await nextNumber(d.kind);
   const prev = S.docs.find(x => x.id === d.id) || {};
@@ -634,7 +634,7 @@ function viewSettings() {
     const btn = e.target.closest('[data-act]');
     if (!btn) return;
     if (btn.dataset.act === 'save') {
-      b.taxRate = +b.taxRate || 0;
+      b.taxRate = normRate(b.taxRate);
       b.termsDays = Math.max(0, parseInt(b.termsDays, 10) || 0);
       S.biz = b;
       await db.put('meta', b);

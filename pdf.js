@@ -1,5 +1,5 @@
 // Builds a clean invoice/quote PDF on the device (no server needed).
-import { totals, money, fmtDate } from './util.js';
+import { totals, money, fmtDate, normRate } from './util.js';
 
 export function buildPdf(doc, biz, customer) {
   const { jsPDF } = window.jspdf;
@@ -71,7 +71,7 @@ export function buildPdf(doc, biz, customer) {
   y += 16;
   const tot = [['Subtotal', money(t.subtotal)]];
   if (t.discount) tot.push(['Discount', '-' + money(t.discount)]);
-  if (t.tax) tot.push([`Tax (${doc.taxRate}%)`, money(t.tax)]);
+  if (t.tax) tot.push([`Tax (${normRate(doc.taxRate)}%)`, money(t.tax)]);
   tot.forEach(([k, v]) => {
     pdf.text(k, cols.price, y, { align: 'right' });
     pdf.text(v, cols.amt - 6, y, { align: 'right' });

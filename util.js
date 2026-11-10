@@ -21,6 +21,12 @@ export function fmtDate(ymd) {
   return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+// Accepts a tax rate typed as 9 or as .09 — both mean 9%. (No real sales tax is under 1%.)
+export function normRate(r) {
+  const n = Math.abs(+r || 0);
+  return n > 0 && n < 1 ? round(n * 100 * 1000) / 1000 : n;
+}
+
 // Tax can apply to everything, or materials only (common for trades — check your state's rules).
 export function totals(doc) {
   let subtotal = 0, taxable = 0;
@@ -32,7 +38,7 @@ export function totals(doc) {
   subtotal = round(subtotal);
   const discount = round(Math.min(+doc.discount || 0, subtotal));
   const taxBase = subtotal ? taxable - discount * (taxable / subtotal) : 0;
-  const tax = round(Math.max(0, taxBase) * (+doc.taxRate || 0) / 100);
+  const tax = round(Math.max(0, taxBase) * normRate(doc.taxRate) / 100);
   return { subtotal, discount, tax, total: round(subtotal - discount + tax) };
 }
 

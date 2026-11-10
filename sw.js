@@ -1,5 +1,5 @@
 // Offline support: cache the app shell, serve it when there's no signal.
-const CACHE = 'quickticket-v1';
+const CACHE = 'quickticket-v2';
 const SHELL = [
   './', 'index.html', 'styles.css', 'app.js', 'db.js', 'pdf.js', 'util.js',
   'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'vendor/jspdf.umd.min.js'
