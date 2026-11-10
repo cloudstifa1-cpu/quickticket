@@ -32,6 +32,13 @@ export function buildPdf(doc, biz, customer) {
     doc.kind === 'invoice' ? `Due: ${fmtDate(doc.dueDate)}` : `Valid until: ${fmtDate(doc.dueDate)}`,
   ];
   meta.forEach((l, i) => pdf.text(l, W - M, M + 40 + i * 13, { align: 'right' }));
+  if (doc.kind === 'invoice' && doc.paid) {
+    const paidOn = doc.paidAt ? fmtDate(doc.paidAt.slice(0, 10)) : '';
+    pdf.setTextColor(0, 140, 60).setFont('helvetica', 'bold').setFontSize(20);
+    pdf.text('PAID', W - M, M + 100, { align: 'right' });
+    pdf.setFontSize(10).text(paidOn ? `Paid ${paidOn} - thank you!` : 'Thank you!', W - M, M + 114, { align: 'right' });
+    pdf.setTextColor(0).setFont('helvetica', 'normal');
+  }
 
   y = Math.max(y + 20 + bizLines.length * 13, M + 90);
 

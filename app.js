@@ -4,7 +4,7 @@ import { buildPdf } from './pdf.js';
 import { round, money, today, addDays, fmtDate, totals, statusOf, esc, normRate } from './util.js';
 
 export const APP_NAME = 'QuickTicket'; // change the app's name here
-const VERSION = '1.0.3';
+const VERSION = '1.0.4';
 
 // ---------- State (loaded from the device database) ----------
 const S = { customers: [], items: [], docs: [], biz: {}, counters: { quote: 1001, invoice: 1001 } };
@@ -94,6 +94,10 @@ function message(d, reminder) {
   if (d.kind === 'quote') {
     return `Hi ${first}, here is quote ${d.number} from ${biz} for ${total}. Reply to approve and we'll get you on the schedule. - ${biz}`;
   }
+  if (d.paid) {
+    const when = d.paidAt ? ` on ${fmtDate(d.paidAt.slice(0, 10))}` : '';
+    return `Hi ${first}, thank you! We received your payment of ${total} for invoice ${d.number}${when}. This is your receipt. - ${biz}`;
+  }
   const lead = {
     pre: `friendly reminder that invoice ${d.number} for ${total} is due ${fmtDate(d.dueDate)}.`,
     due: `invoice ${d.number} for ${total} is due today.`,
@@ -134,7 +138,7 @@ async function send(d, channel, reminder) {
   if (channel === 'text') {
     location.href = `sms:${c.phone.replace(/[^\d+]/g, '')}?body=${encodeURIComponent(text)}`;
   } else if (channel === 'email') {
-    const subject = `${d.kind === 'quote' ? 'Quote' : 'Invoice'} ${d.number} from ${S.biz.name || ''}`.trim();
+    const subject = `${d.kind === 'quote' ? 'Quote' : d.paid ? 'Receipt for invoice' : 'Invoice'} ${d.number} from ${S.biz.name || ''}`.trim();
     location.href = `mailto:${c.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`;
   } else {
     const pdf = buildPdf(d, S.biz, c);
